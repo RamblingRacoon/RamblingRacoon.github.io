@@ -24,6 +24,8 @@
             font-family: monospace;
     </style>
     <script>
+    IN_VR_MODE = false;
+
    AFRAME.registerComponent('clickhandler', {
         multiple: true,
         schema: {
@@ -67,6 +69,22 @@
         setTimeout(() => {
             container.parentElement.removeChild(container);
         }, 1500);
+
+
+        if (IN_VR_MODE){
+            const label = document.createElement('a-text');
+            label.setAttribute('color', "#1b427d");
+            label.setAttribute('value', name);
+
+            label.setAttribute('look-at', "[gps-camera]");
+            label.setAttribute('scale', '10, 10');
+            label.setAttribute('gps-entity-place', `latitude: 43.654871; longitude: -79.383377`);
+            const cam = document.querySelector('a-camera');
+            cam.appendChild(label);
+            setTimeout(() => {
+                cam.removeChild(label);
+            }, 1500);
+        }
       });
 
       el.addEventListener('mouseleave', function () {
@@ -111,14 +129,19 @@
               
             <a-camera gps-camera="simulateLatitude: 43.654562; simulateLongitude: -79.383256;" rotation-reader>
               <a-cursor material="color: blue; shader: flat"></a-cursor>
-                <!-- <a-text color="red" value="Hello, World!" look-at="[gps-camera]"
-                        scale="15 15" gps-entity-place="latitude: 43.654871; longitude: -79.383377;"></a-text>-->
+                
             </a-camera>
         </a-scene>
 
 
         <script>
+    document.querySelector('a-scene').addEventListener('enter-vr', function () {
+        IN_VR_MODE = true;
+    });
 
+    document.querySelector('a-scene').addEventListener('exit-vr', function () {
+        IN_VR_MODE = false;
+    });
 
 const loadPlaces = function(result) {
     // COMMENT FOLLOWING LINE IF YOU WANT TO USE STATIC DATA AND ADD COORDINATES IN THE FOLLOWING 'PLACES' ARRAY
