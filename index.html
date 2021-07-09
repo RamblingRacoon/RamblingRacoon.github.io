@@ -1,25 +1,2225 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Covid19 HealthCare AR Demo</title>
-    <script src="/override_geo.b8034144.js"></script>
-<script src="/style.e308ff8e.js"></script></head>
-<link rel="stylesheet" href="/style.e308ff8e.css">
-<!-- Dynamically add places from Javascript -->
-<script src="/places.ac65a80a.js"></script>
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+        <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+        <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+        <script src=https://static.healthcarelocator.com/v1/hcl-sdk-web-ui/hcl-sdk.js></script>
+    <script src=https://static.healthcarelocator.com/v1/hcl-sdk-api/hcl-sdk-api.js></script>
+    <style>
+    #place-label {
+    position: absolute;
+    top: 5%;
+    left: 0%;
+    display: flex;
+    justify-content: center;
+    color: BLACK;
+    font-size: 24px;
+    background-color: #eee;
+        width: 100%;
+        padding:10px;
+    </style>
+    <script>
+   AFRAME.registerComponent('clickhandler', {
+        multiple: true,
+        schema: {
+          txt: {default:'default'}
+        },        
+        init: function () {
+          var data = this.data;
+          var el = this.el;        
+          el.addEventListener('click', function () {            
+           console.log(data.txt);
+          });        
+        },
+        events: {
+    click: function (evt) {
+      console.log('This entity was clicked!');
+      
+    }
+  }
+      });
 
-<body style="margin: 0; overflow: hidden;">
-    <script src="https://aframe.io/releases/0.9.2/aframe.min.js"></script>
-    <script src="https://raw.githack.com/jeromeetienne/AR.js/master/aframe/build/aframe-ar.min.js"></script>
-    <script>THREEx.ArToolkitContext.baseURL = 'https://raw.githack.com/jeromeetienne/ar.js/master/three.js/';</script>
-    <script src="https://static.healthcarelocator.com/v1/hcl-sdk-web-ui/hcl-sdk.js"></script>
-    <script src="https://static.healthcarelocator.com/v1/hcl-sdk-api/hcl-sdk-api.js"></script>
+      AFRAME.registerComponent('cursor-hover-handler', {
+    schema: {
+      color: {default: ''}
+    },
+
+    init: function () {
+      var data = this.data;
+      var el = this.el;  // <a-box>
+      var defaultName = el.getAttribute('name');
+
+      el.addEventListener('mouseenter', function (evt) {
+        console.log("CURSOR ENTER");
+        const label = document.createElement('span');
+        const container = document.createElement('div');
+        container.setAttribute('id', 'place-label');
+        const name = evt.target.getAttribute("name")
+        label.innerText = name;
+        container.appendChild(label);
+        document.body.appendChild(container);
+
+        setTimeout(() => {
+            container.parentElement.removeChild(container);
+        }, 1500);
+      });
+
+      el.addEventListener('mouseleave', function () {
+        //el.setAttribute('color', defaultName);
+      });
+    }
+  });
+    </script>
+    </head>
+
+    <body style="margin: 0; overflow: hidden;">
+        <a-scene
+
+         
+        raycaster="objects: [gps-entity-place];"
+        vr-mode-ui="enabled: false"
+		embedded
+            loading-screen="enabled: false;"
+            arjs="sourceType: webcam; debugUIEnabled: true;"
+        >
+        
+ <!-- 
+        <a-image
+                        name="TEST"
+                        src="assets/asset.png"
+                        look-at="[gps-camera]"
+                        scale="1 1 1"
+                        gps-entity-place="latitude: 43.6549; longitude: -79.3835;"
+                        clickhandler="txt:image1"
+                        cursor-hover-handler="name: blue"
+                    ></a-image>
+        
+                    {% comment %} <a-image
+                        name="TEST"
+                        src="assets/asset.png"
+                        look-at="[gps-camera]"
+                        scale="1 1 1"
+                        gps-entity-place="latitude: 43.6549; longitude: -79.3835;"
+                    ></a-image>
+                    <a-text color="red" value="Hello, World!" look-at="[gps-camera]"
+                        scale="1 1 1" gps-entity-place="latitude: 43.6549; longitude: -79.3835;"></a-text> -->
+            <a-camera gps-camera="simulateLatitude: 43.654562; simulateLongitude: -79.383256;" rotation-reader>
+              <a-cursor material="color: blue; shader: flat"></a-cursor>
+            </a-camera>
+        </a-scene>
+
+
+        <script>
+
+
+const loadPlaces = function(result) {
+    // COMMENT FOLLOWING LINE IF YOU WANT TO USE STATIC DATA AND ADD COORDINATES IN THE FOLLOWING 'PLACES' ARRAY
+    const method = 'api';
+
+    const PLACES = result.data.activities.map(
+        (activity) =>{
+            const individual = activity["activity"]["individual"];
+            const workplace_geo = activity["activity"]["workplace"]["address"]["location"]
+            const activity_name = `${individual["firstName"]} ${individual["lastName"]} (${individual["specialties"].reduce((reducer,obj) => {
+                let sep = "";
+                if (reducer.length !=0) {
+                    sep = ", ";
+                }
+                return reducer + sep + obj.label ;
+            }, "")})`;
+            return {
+                name: activity_name,
+                location: {
+                    lat: workplace_geo["lat"], // add here latitude if using static data
+                    lng: workplace_geo["lon"], // add here longitude if using static data
+                }
+            };
+        }
+    )
+    console.log(PLACES);
+    // console.log("CURRENT LOCATION");
+    // console.log(coords)
+    // if (method === 'api') {
+    //     return loadPlaceFromAPIs(coords);
+    // }
+
+    return Promise.resolve(PLACES);
+};
+
+
+function processActivites(result){
+    navigator.geolocation.getCurrentPosition(function (position) {
+        console.log("POSITION: ")
+        console.log(position)
+        // then use it to load from remote APIs some places nearby
+        // let geolocations = position.coords;
+        // geolocations = {
+            // latitude: 40.8185, // add here latitude if using static data
+            // longitude: -74.1589, // add here longitude if using static data
+           
+        // }
+        loadPlaces(result)
+            .then(placesHandler)
+    },
+        (err) => console.error('Error in retrieving position', err),
+        {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 27000,
+        }
+    );
+
+}
+
+var placesHandler= (places) => {
+    const scene = document.querySelector('a-scene');
+    places.forEach((place) => {
+        const latitude = place.location.lat;
+        const longitude = place.location.lng;
+
+        // add place icon
+        const label = document.createElement('a-text');
+        label.setAttribute('color', "red");
+        label.setAttribute('value', place.name);
+        label.setAttribute('color', "red");
+        label.setAttribute('look-at', "[gps-camera]");
+        label.setAttribute('scale', '20, 20');
+        label.setAttribute('gps-entity-place', `latitude: ${latitude}; longitude: ${longitude}`);
+        const icon = document.createElement('a-image');
+        icon.setAttribute('gps-entity-place', `latitude: ${latitude}; longitude: ${longitude}`);
+        icon.setAttribute('name', place.name);
+        imageUrl = "assets/asset.png"
+        icon.setAttribute('src', imageUrl);
+        icon.setAttribute('clickhandler', "");
+        icon.setAttribute("cursor-hover-handler", place.name);
+        // for debug purposes, just show in a bigger scale, otherwise I have to personally go on places...
+        icon.setAttribute('scale', '20, 20');
+        icon.setAttribute('look-at', '[gps-camera]');
+//        icon.setAttribute("mouse-cursor", "");
+        icon.addEventListener('loaded', () => window.dispatchEvent(new CustomEvent('gps-entity-place-loaded')));
+
+        const clickListener = function(ev) {
+            ev.stopPropagation();
+            ev.preventDefault();
+
+            const name = ev.target.getAttribute('name');
+
+            const el = ev.detail.intersection && ev.detail.intersection.object.el;
+
+            if (el && el === ev.target) {
+
+            }
+        };
+
+        icon.addEventListener('click', clickListener);
+        
+        scene.appendChild(icon);
+        //scene.appendChild(label);
+    });
+}
+
+        document.addEventListener("DOMContentLoaded", function(event) { 
+            window.onload = () => {
     
-    <a-scene cursor="rayOrigin: mouse; fuse: true; fuseTimeout: 0;" raycaster="objects: [gps-entity-place];" vr-mode-ui="enabled: false" embedded="" arjs="sourceType: webcam; sourceWidth:1280; sourceHeight:960; displayWidth: 1280; displayHeight: 960; debugUIEnabled: false;">
 
-        <a-camera gps-camera="simulateLatitude: 43.6549; simulateLongitude: -79.3835;" rotation-reader="">
-		</a-camera>
-	</a-scene>
-</body></html>
+    const hclAPI = new HclAPI({
+        apiKey: '300158323ddd217b' // To replace by a working API key
+    });
+      const params = {
+
+        first: 50,
+  
+        offset: 0,
+        location: {
+            lat: 43.6534817,
+            lon: -79.3839347,
+            distanceMeter: 2000
+          },
+        country: "ca",
+        criteria: "",
+        locale: "en"
+      };
+  
+      hclAPI
+        .activities(params)
+        .then(result => {
+          // The list of activities
+          console.log(result)
+
+          result = {
+            "data":{
+               "activities":[
+                  {
+                     "distance":161.5,
+                     "relevance":1,
+                     "activity":{
+                        "id":"WCAM0008844602",
+                        "individual":{
+                           "id":"WCAM00088446",
+                           "firstName":"Jonathan",
+                           "lastName":"Levy",
+                           "middleName":"Michael Stephen",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00029833",
+                           "address":{
+                              "longLabel":"536-790 Bay St",
+                              "buildingLabel":"Continental Canada Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6549,
+                                 "lon":-79.3835
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":161.5,
+                     "relevance":2,
+                     "activity":{
+                        "id":"WCAM0003025302",
+                        "individual":{
+                           "id":"WCAM00030253",
+                           "firstName":"Jennifer",
+                           "lastName":"Salsberg",
+                           "middleName":"Michelle",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00029833",
+                           "address":{
+                              "longLabel":"536-790 Bay St",
+                              "buildingLabel":"Continental Canada Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6549,
+                                 "lon":-79.3835
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":161.5,
+                     "relevance":3,
+                     "activity":{
+                        "id":"WCAM0002964605",
+                        "individual":{
+                           "id":"WCAM00029646",
+                           "firstName":"Renee",
+                           "lastName":"Beach",
+                           "middleName":"Ayana",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00029833",
+                           "address":{
+                              "longLabel":"536-790 Bay St",
+                              "buildingLabel":"Continental Canada Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6549,
+                                 "lon":-79.3835
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":161.5,
+                     "relevance":4,
+                     "activity":{
+                        "id":"WCAM0009165306",
+                        "individual":{
+                           "id":"WCAM00091653",
+                           "firstName":"Michael",
+                           "lastName":"Cecchini",
+                           "middleName":"Matthew John",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00029833",
+                           "address":{
+                              "longLabel":"536-790 Bay St",
+                              "buildingLabel":"Continental Canada Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6549,
+                                 "lon":-79.3835
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":161.5,
+                     "relevance":5,
+                     "activity":{
+                        "id":"WCAM0005808701",
+                        "individual":{
+                           "id":"WCAM00058087",
+                           "firstName":"Sandra",
+                           "lastName":"Skotnicki Grant",
+                           "middleName":"Mary",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00029833",
+                           "address":{
+                              "longLabel":"536-790 Bay St",
+                              "buildingLabel":"Continental Canada Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6549,
+                                 "lon":-79.3835
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":188.6,
+                     "relevance":6,
+                     "activity":{
+                        "id":"WCAM0005932901",
+                        "individual":{
+                           "id":"WCAM00059329",
+                           "firstName":"Alexandru",
+                           "lastName":"Opris",
+                           "middleName":"Antoniu Felician",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00021433",
+                           "address":{
+                              "longLabel":"404-1240 Bay St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6522,
+                                 "lon":-79.3824
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":188.6,
+                     "relevance":7,
+                     "activity":{
+                        "id":"WCAM0004000703",
+                        "individual":{
+                           "id":"WCAM00040007",
+                           "firstName":"Catherine",
+                           "lastName":"Feuer",
+                           "middleName":"Frances",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00021433",
+                           "address":{
+                              "longLabel":"404-1240 Bay St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6522,
+                                 "lon":-79.3824
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":8,
+                     "activity":{
+                        "id":"WCAM0005420603",
+                        "individual":{
+                           "id":"WCAM00054206",
+                           "firstName":"Edward",
+                           "lastName":"Bekeris",
+                           "middleName":"",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":9,
+                     "activity":{
+                        "id":"WCAM0007779304",
+                        "individual":{
+                           "id":"WCAM00077793",
+                           "firstName":"Renita",
+                           "lastName":"Ahluwalia",
+                           "middleName":"",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":10,
+                     "activity":{
+                        "id":"WCAM0005930003",
+                        "individual":{
+                           "id":"WCAM00059300",
+                           "firstName":"John",
+                           "lastName":"Stephen",
+                           "middleName":"Daniel",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":11,
+                     "activity":{
+                        "id":"WCAM0003025303",
+                        "individual":{
+                           "id":"WCAM00030253",
+                           "firstName":"Jennifer",
+                           "lastName":"Salsberg",
+                           "middleName":"Michelle",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":12,
+                     "activity":{
+                        "id":"WCAM0005915801",
+                        "individual":{
+                           "id":"WCAM00059158",
+                           "firstName":"James",
+                           "lastName":"Aw",
+                           "middleName":"Jinhyck",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":13,
+                     "activity":{
+                        "id":"WCAM0005795203",
+                        "individual":{
+                           "id":"WCAM00057952",
+                           "firstName":"Elizabeth",
+                           "lastName":"McKeown",
+                           "middleName":"Margaret",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":14,
+                     "activity":{
+                        "id":"WCAM0007486104",
+                        "individual":{
+                           "id":"WCAM00074861",
+                           "firstName":"Julia",
+                           "lastName":"Carroll",
+                           "middleName":"Marie",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":15,
+                     "activity":{
+                        "id":"WCAM0005790606",
+                        "individual":{
+                           "id":"WCAM00057906",
+                           "firstName":"Paul",
+                           "lastName":"Cohen",
+                           "middleName":"David",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":16,
+                     "activity":{
+                        "id":"WCAM0005917101",
+                        "individual":{
+                           "id":"WCAM00059171",
+                           "firstName":"Susy",
+                           "lastName":"Lin",
+                           "middleName":"",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":17,
+                     "activity":{
+                        "id":"WCAM0009846806",
+                        "individual":{
+                           "id":"WCAM00098468",
+                           "firstName":"Kristy",
+                           "lastName":"Bailey",
+                           "middleName":"Elisa",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00001232",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":18,
+                     "activity":{
+                        "id":"WCAM0005455703",
+                        "individual":{
+                           "id":"WCAM00054557",
+                           "firstName":"Alain",
+                           "lastName":"Sotto",
+                           "middleName":"G",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":19,
+                     "activity":{
+                        "id":"WCAM0004084504",
+                        "individual":{
+                           "id":"WCAM00040845",
+                           "firstName":"William",
+                           "lastName":"Bateman",
+                           "middleName":"Aird",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":20,
+                     "activity":{
+                        "id":"WCAM0005916101",
+                        "individual":{
+                           "id":"WCAM00059161",
+                           "firstName":"Subita",
+                           "lastName":"Behki",
+                           "middleName":"",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":21,
+                     "activity":{
+                        "id":"WCAM0005768306",
+                        "individual":{
+                           "id":"WCAM00057683",
+                           "firstName":"Michelle",
+                           "lastName":"Levy",
+                           "middleName":"",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":22,
+                     "activity":{
+                        "id":"WCAM0005830101",
+                        "individual":{
+                           "id":"WCAM00058301",
+                           "firstName":"David",
+                           "lastName":"Young",
+                           "middleName":"Shi Fan",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00019250",
+                           "address":{
+                              "longLabel":"1600-55 York St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":23,
+                     "activity":{
+                        "id":"WCAM0007385001",
+                        "individual":{
+                           "id":"WCAM00073850",
+                           "firstName":"Andrew",
+                           "lastName":"Peller",
+                           "middleName":"Angus",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00001232",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":276.01,
+                     "relevance":24,
+                     "activity":{
+                        "id":"WCAM0004326003",
+                        "individual":{
+                           "id":"WCAM00043260",
+                           "firstName":"Matthew",
+                           "lastName":"Burnstein",
+                           "middleName":"David",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009311",
+                           "address":{
+                              "longLabel":"1500-150 York St",
+                              "buildingLabel":"National Bank Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6511,
+                                 "lon":-79.3849
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":291.3,
+                     "relevance":25,
+                     "activity":{
+                        "id":"WCAM0004155302",
+                        "individual":{
+                           "id":"WCAM00041553",
+                           "firstName":"Veena",
+                           "lastName":"Rai",
+                           "middleName":"P K",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009304",
+                           "address":{
+                              "longLabel":"F.01-595 Bay St",
+                              "buildingLabel":"Atrium On Bay",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6561,
+                                 "lon":-79.3838
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":291.3,
+                     "relevance":26,
+                     "activity":{
+                        "id":"WCAM0008462902",
+                        "individual":{
+                           "id":"WCAM00084629",
+                           "firstName":"Faith Hallward",
+                           "lastName":"Paterson",
+                           "middleName":"",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00009304",
+                           "address":{
+                              "longLabel":"F.01-595 Bay St",
+                              "buildingLabel":"Atrium On Bay",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6561,
+                                 "lon":-79.3838
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":300.27,
+                     "relevance":27,
+                     "activity":{
+                        "id":"WCAM0005943303",
+                        "individual":{
+                           "id":"WCAM00059433",
+                           "firstName":"Suan-Seh",
+                           "lastName":"Foo",
+                           "middleName":"",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00002238",
+                           "address":{
+                              "longLabel":"401-790 Bay St",
+                              "buildingLabel":"Continental Canada Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6515,
+                                 "lon":-79.3814
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":327.29,
+                     "relevance":28,
+                     "activity":{
+                        "id":"WCAM0005370702",
+                        "individual":{
+                           "id":"WCAM00053707",
+                           "firstName":"Kan",
+                           "lastName":"Fung",
+                           "middleName":"Ying",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00022075",
+                           "address":{
+                              "longLabel":"201-480 Dundas St W",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6549,
+                                 "lon":-79.3875
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":327.29,
+                     "relevance":29,
+                     "activity":{
+                        "id":"WCAM0005370402",
+                        "individual":{
+                           "id":"WCAM00053704",
+                           "firstName":"John",
+                           "lastName":"Chan",
+                           "middleName":"Wing Lun",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00022075",
+                           "address":{
+                              "longLabel":"201-480 Dundas St W",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6549,
+                                 "lon":-79.3875
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":327.29,
+                     "relevance":30,
+                     "activity":{
+                        "id":"WCAM0005961901",
+                        "individual":{
+                           "id":"WCAM00059619",
+                           "firstName":"King Sun",
+                           "lastName":"Chan",
+                           "middleName":"",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00022075",
+                           "address":{
+                              "longLabel":"201-480 Dundas St W",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6549,
+                                 "lon":-79.3875
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":327.54,
+                     "relevance":31,
+                     "activity":{
+                        "id":"WCAM0008591404",
+                        "individual":{
+                           "id":"WCAM00085914",
+                           "firstName":"Glen",
+                           "lastName":"Armstrong",
+                           "middleName":"Lawrence",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00076757",
+                           "address":{
+                              "longLabel":"112 10 St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Alberta"
+                              },
+                              "city":{
+                                 "label":"Beaverlodge"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6513,
+                                 "lon":-79.3812
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":329.53,
+                     "relevance":32,
+                     "activity":{
+                        "id":"WCAM0005965903",
+                        "individual":{
+                           "id":"WCAM00059659",
+                           "firstName":"Ying",
+                           "lastName":"Toong",
+                           "middleName":"Lai Hannah",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00056367",
+                           "address":{
+                              "longLabel":"601-123 Edward St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6556,
+                                 "lon":-79.3868
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":329.53,
+                     "relevance":33,
+                     "activity":{
+                        "id":"WCAM0005853301",
+                        "individual":{
+                           "id":"WCAM00058533",
+                           "firstName":"Peter",
+                           "lastName":"Satok",
+                           "middleName":"Maxwell",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00018667",
+                           "address":{
+                              "longLabel":"718-123 Edward St",
+                              "buildingLabel":"Toronto Professional Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6556,
+                                 "lon":-79.3868
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":340.96,
+                     "relevance":34,
+                     "activity":{
+                        "id":"WCAM0005759701",
+                        "individual":{
+                           "id":"WCAM00057597",
+                           "firstName":"Ariz",
+                           "lastName":"Engineer",
+                           "middleName":"Aspi",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00026766",
+                           "address":{
+                              "longLabel":"209-2401 Yonge St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6536,
+                                 "lon":-79.3797
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":343.35,
+                     "relevance":35,
+                     "activity":{
+                        "id":"WCAM0005819701",
+                        "individual":{
+                           "id":"WCAM00058197",
+                           "firstName":"Ian",
+                           "lastName":"Gallimore",
+                           "middleName":"Christopher Graham",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00014455",
+                           "address":{
+                              "longLabel":"210-1849 Yonge St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6531,
+                                 "lon":-79.3797
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":345.77,
+                     "relevance":36,
+                     "activity":{
+                        "id":"WCAM0009599702",
+                        "individual":{
+                           "id":"WCAM00095997",
+                           "firstName":"Michael",
+                           "lastName":"Schiff",
+                           "middleName":"Dov",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00064802",
+                           "address":{
+                              "longLabel":"400-123 Edward St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6558,
+                                 "lon":-79.3868
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":352.85,
+                     "relevance":37,
+                     "activity":{
+                        "id":"WCAM0006012601",
+                        "individual":{
+                           "id":"WCAM00060126",
+                           "firstName":"Raafat",
+                           "lastName":"Gindi",
+                           "middleName":"Fahim",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00042016",
+                           "address":{
+                              "longLabel":"206-1366 Yonge St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.653,
+                                 "lon":-79.3796
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":354.71,
+                     "relevance":38,
+                     "activity":{
+                        "id":"WCAM0005782005",
+                        "individual":{
+                           "id":"WCAM00057820",
+                           "firstName":"Rami",
+                           "lastName":"Mozes",
+                           "middleName":"Shaul",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00039620",
+                           "address":{
+                              "longLabel":"202-2401 Yonge St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6529,
+                                 "lon":-79.3796
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":384.17,
+                     "relevance":39,
+                     "activity":{
+                        "id":"WCAM0006015501",
+                        "individual":{
+                           "id":"WCAM00060155",
+                           "firstName":"Kenneth",
+                           "lastName":"Harrison",
+                           "middleName":"John",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00018265",
+                           "address":{
+                              "longLabel":"2.4-1001 Queen St W",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6524,
+                                 "lon":-79.3794
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":393.63,
+                     "relevance":40,
+                     "activity":{
+                        "id":"WCAM0003376210",
+                        "individual":{
+                           "id":"WCAM00033762",
+                           "firstName":"Sanjay",
+                           "lastName":"Siddha",
+                           "middleName":"Kumar",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00042027",
+                           "address":{
+                              "longLabel":"309-1366 Yonge St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6562,
+                                 "lon":-79.3808
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":393.63,
+                     "relevance":41,
+                     "activity":{
+                        "id":"WCAM0003556202",
+                        "individual":{
+                           "id":"WCAM00035562",
+                           "firstName":"Martie",
+                           "lastName":"Gidon",
+                           "middleName":"Sigrid",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00002167",
+                           "address":{
+                              "longLabel":"307-1849 Yonge St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6562,
+                                 "lon":-79.3808
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":393.63,
+                     "relevance":42,
+                     "activity":{
+                        "id":"WCAM0005930201",
+                        "individual":{
+                           "id":"WCAM00059302",
+                           "firstName":"Brenda",
+                           "lastName":"Woolley",
+                           "middleName":"A",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00028193",
+                           "address":{
+                              "longLabel":"305-1366 Yonge St",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6562,
+                                 "lon":-79.3808
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":402.9,
+                     "relevance":43,
+                     "activity":{
+                        "id":"WCAM0006032901",
+                        "individual":{
+                           "id":"WCAM00060329",
+                           "firstName":"Robert",
+                           "lastName":"Stachula",
+                           "middleName":"Bogdan Jan",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAE00033521",
+                           "address":{
+                              "longLabel":"214-2238 Dundas St W",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6548,
+                                 "lon":-79.3886
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":408.57,
+                     "relevance":44,
+                     "activity":{
+                        "id":"WCAM0005957002",
+                        "individual":{
+                           "id":"WCAM00059570",
+                           "firstName":"Katarina",
+                           "lastName":"Fiala",
+                           "middleName":"",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00002873",
+                           "address":{
+                              "longLabel":"250 University Ave",
+                              "buildingLabel":"Bank of Canada Building",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6504,
+                                 "lon":-79.3867
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":416.2,
+                     "relevance":45,
+                     "activity":{
+                        "id":"WCAM0006479701",
+                        "individual":{
+                           "id":"WCAM00064797",
+                           "firstName":"Isaac",
+                           "lastName":"Odame",
+                           "middleName":"",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00016496",
+                           "address":{
+                              "longLabel":"BW-9411-555 University Ave",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6551,
+                                 "lon":-79.3886
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":416.2,
+                     "relevance":46,
+                     "activity":{
+                        "id":"WCAM0011120703",
+                        "individual":{
+                           "id":"WCAM00111207",
+                           "firstName":"Patrik",
+                           "lastName":"Rogalla",
+                           "middleName":"",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00079541",
+                           "address":{
+                              "longLabel":"3-920-610 University Ave",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6551,
+                                 "lon":-79.3886
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":416.2,
+                     "relevance":47,
+                     "activity":{
+                        "id":"WCAM0003374502",
+                        "individual":{
+                           "id":"WCAM00033745",
+                           "firstName":"Miriam",
+                           "lastName":"Weinstein",
+                           "middleName":"Gayla",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              },
+                              {
+                                 "label":"Pediatrics"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00016376",
+                           "address":{
+                              "longLabel":"555 University Ave Main Floor",
+                              "buildingLabel":"Elm Wing",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6551,
+                                 "lon":-79.3886
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":416.2,
+                     "relevance":48,
+                     "activity":{
+                        "id":"WCAM0003375803",
+                        "individual":{
+                           "id":"WCAM00033758",
+                           "firstName":"Maria",
+                           "lastName":"Lansang",
+                           "middleName":"Perla Lucila Estevez Tecson",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"Dermatology"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00016376",
+                           "address":{
+                              "longLabel":"555 University Ave Main Floor",
+                              "buildingLabel":"Elm Wing",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6551,
+                                 "lon":-79.3886
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":421.96,
+                     "relevance":49,
+                     "activity":{
+                        "id":"WCAM0008001901",
+                        "individual":{
+                           "id":"WCAM00080019",
+                           "firstName":"Natasha",
+                           "lastName":"Crowcroft",
+                           "middleName":"Sarah",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00029270",
+                           "address":{
+                              "longLabel":"300-480 University Ave",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6549,
+                                 "lon":-79.3888
+                              }
+                           }
+                        }
+                     }
+                  },
+                  {
+                     "distance":421.96,
+                     "relevance":50,
+                     "activity":{
+                        "id":"WCAM0005353303",
+                        "individual":{
+                           "id":"WCAM00053533",
+                           "firstName":"Giorgio",
+                           "lastName":"Pasut",
+                           "middleName":"",
+                           "professionalType":{
+                              "label":"Physician"
+                           },
+                           "specialties":[
+                              {
+                                 "label":"General Practice"
+                              }
+                           ]
+                        },
+                        "workplace":{
+                           "id":"WCAH00029270",
+                           "address":{
+                              "longLabel":"300-480 University Ave",
+                              "buildingLabel":"",
+                              "county":{
+                                 "label":"Ontario"
+                              },
+                              "city":{
+                                 "label":"Toronto"
+                              },
+                              "country":"CA",
+                              "location":{
+                                 "lat":43.6549,
+                                 "lon":-79.3888
+                              }
+                           }
+                        }
+                     }
+                  }
+               ]
+            }
+         };
+
+         processActivites(result);
+        })
+  
+        .catch(err => {
+  
+          // An error happened.
+  
+        })
+      
+};
+        });
+        </script>
+    </body>
+</html>
